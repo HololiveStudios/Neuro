@@ -1,48 +1,119 @@
+# =======================================================================
+# Makefile — Certinho / Pestinha
+#
+# Targets:
+#   make                   Linux, SDL2  → ./pestinha
+#   make windows           Windows .exe → ./pestinha.exe  (cross MinGW)
+#   make debug             Linux SDL2 + AddressSanitizer
+#   make headless          sem display  → ./pestinha
+#   make clean
+#
+# Dependências Linux:
+#   sudo apt install gcc libsdl2-dev
+#
+# Dependências Windows (cross-compile no Linux):
+#   sudo apt install mingw-w64
+#   Baixar SDL2-devel-X.X.X-mingw.tar.gz em https://libsdl.org/download-2.0.php
+#   Extrair e apontar SDL_WIN abaixo para a pasta x86_64-w64-mingw32/
+# =======================================================================
 
-CC = gcc
-CFLAGS = -O2 -std=c99 -Wall -Wextra -Wpedantic
-LDLIBS = -lm -lxcb
+CC      = gcc
+TARGET  = pestinha
 
-TARGET = certinho
+# Pasta do SDL2 para MinGW — ajuste para o caminho no seu sistema
+# Exemplo: SDL_WIN = $(HOME)/sdl2-mingw/x86_64-w64-mingw32
+SDL_WIN ?= $(HOME)/sdl2-mingw/x86_64-w64-mingw32
 
-SRCS = pestinha.c events.c world.c behavior.c homeostasis.c conditioning.c memory.c neuro.c display_xcb.c body.c fx.c gfx.c xutil.c ui.c sensors.c
-HDRS = events.h world.h behavior.h homeostasis.h conditioning.h memory.h neuro.h display_xcb.h body.h fx.h gfx.h xutil.h ui.h sensors.h
+CFLAGS_BASE = -std=c11 -Wall -Wextra -O2 -ffast-math -I.
+
+# =======================================================================
+# Fontes comuns (sem o backend gráfico — escolhido por target)
+# =======================================================================
+
+SRCS_CORE = \
+    pestinha.c      \
+    neuro.c         \
+    gfx.c           \
+    render_null.c   \
+    behavior.c      \
+    body.c          \
+    conditioning.c  \
+    events.c        \
+    fx.c            \
+    homeostasis.c   \
+    memory.c        \
+    sensors.c       \
+    ui.c            \
+    world.c
+
+# =======================================================================
+# Linux — SDL2
+# =======================================================================
+
+SRCS_LINUX = $(SRCS_CORE) render_sdl2.c
+
+CFLAGS_LINUX = $(CFLAGS_BASE) $(shell sdl2-config --cflags)
+LIBS_LINUX   = $(shell sdl2-config --libs) -lm
 
 all: $(TARGET)
 
-$(TARGET): $(SRCS) $(HDRS)
-	$(CC) $(CFLAGS) -o $@ $(SRCS) $(LDLIBS)
+$(TARGET): $(SRCS_LINUX)
+	$(CC) $(CFLAGS_LINUX) -o $@ $^ $(LIBS_LINUX)
 
-test_body: tests/test_body.c body.c body.h
-	$(CC) $(CFLAGS) -o $@ tests/test_body.c body.c -lm
+# =======================================================================
+# Debug — Linux SDL2 + sanitizers
+# =======================================================================
 
-test_fx: tests/test_fx.c fx.c gfx.c xutil.c body.c fx.h gfx.h xutil.h body.h
-	$(CC) $(CFLAGS) -o $@ tests/test_fx.c fx.c gfx.c xutil.c body.c $(LDLIBS)
+debug: CFLAGS_LINUX += -O0 -g3 -fsanitize=address,undefined -fno-omit-frame-pointer
+debug: LIBS_LINUX   += -fsanitize=address,undefined
+debug: $(TARGET)
 
-test_display: tests/test_display.c display_xcb.c xutil.c gfx.c display_xcb.h xutil.h gfx.h
-	$(CC) $(CFLAGS) -o $@ tests/test_display.c display_xcb.c xutil.c gfx.c $(LDLIBS)
+# =======================================================================
+# Windows .exe — cross-compile com MinGW
+# =======================================================================
 
-test_sensors: tests/test_sensors.c sensors.c sensors.h
-	$(CC) $(CFLAGS) -o $@ tests/test_sensors.c sensors.c $(LDLIBS)
+CC_WIN   = x86_64-w64-mingw32-gcc
+TARGET_WIN = pestinha.exe
 
-test: test_body test_fx test_display test_sensors
-	./test_body
-	./test_fx
-	./test_display 1 0 2
-	./test_sensors
-	@echo "Todos os testes passaram!"
+SRCS_WIN = $(SRCS_CORE) render_sdl2.c
 
-demo: $(TARGET)
-	./$(TARGET) --demo
+CFLAGS_WIN = -std=c11 -Wall -Wextra -O2 -ffast-math \
+             -I. -I$(SDL_WIN)/include/SDL2 \
+             -DWIN32 -D_WIN32
 
-evaluate: $(TARGET)
-	./$(TARGET) --evaluate
+LIBS_WIN = -L$(SDL_WIN)/lib \
+           -lSDL2 -lSDL2main \
+           -lm -mwindows \
+           -static-libgcc
 
-metrics: $(TARGET)
-	./$(TARGET) --metrics
+windows: $(SRCS_WIN)
+	$(CC_WIN) $(CFLAGS_WIN) -o $(TARGET_WIN) $^ $(LIBS_WIN)
+	@echo ""
+	@echo ">>> Copie $(SDL_WIN)/bin/SDL2.dll para a mesma pasta do .exe"
+
+# =======================================================================
+# Headless — sem display, útil para Valgrind/Massif
+# =======================================================================
+
+SRCS_HEADLESS = $(SRCS_CORE)
+CFLAGS_HEADLESS = $(CFLAGS_BASE) -DPESTINHA_HEADLESS
+LIBS_HEADLESS = -lm
+
+headless:
+	$(CC) $(CFLAGS_HEADLESS) -o $(TARGET) $(SRCS_HEADLESS) $(LIBS_HEADLESS)
+
+# =======================================================================
+# Massif
+# =======================================================================
+
+massif: headless
+	valgrind --tool=massif --pages-as-heap=yes \
+	         --massif-out-file=massif.out ./$(TARGET)
+	ms_print massif.out | head -80
+
+# =======================================================================
 
 clean:
-	rm -f $(TARGET) test_body test_fx test_display test_sensors *.o
+	rm -f *.o $(TARGET) $(TARGET_WIN) massif.out
 
-.PHONY: all test demo evaluate metrics clean
-
+.PHONY: all debug windows headless massif clean

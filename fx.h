@@ -1,0 +1,42 @@
+#ifndef PESTINHA_FX_H
+#define PESTINHA_FX_H
+
+#include "body.h"
+
+/* Efeitos visuais do modo desktop, desenhados numa camada de tela cheia que
+   so aparece onde ha objetos (forma recortada) e deixa o mouse passar:
+   cartazes, bilhetes, placa do castigo, bolinhas de papel, fogos, notebook,
+   e a bolinha de brincar (janela propria, que o usuario pode arrastar). */
+typedef struct Fx Fx;
+typedef enum { FX_NONE = 0, FX_BALL_GRAB, FX_BALL_THROW } FxEventType;
+typedef struct { int type; double speed; } FxEvent;
+
+enum { FX_STYLE_PROTEST = 0, FX_STYLE_NOTE = 1, FX_STYLE_SIGN = 2, FX_STYLE_PRANK = 3 };
+
+Fx *fx_open(void);
+void fx_close(Fx *fx);
+void fx_set_visible(Fx *fx, int visible);
+void fx_raise(Fx *fx);
+
+/* ttl <= 0: fica ate ser removido. Devolve um id para fx_remove. */
+int  fx_poster(Fx *fx, int x, int y, const char *title, const char *sub, int style, double ttl);
+void fx_remove(Fx *fx, int id);
+void fx_clear(Fx *fx);                       /* tira cartazes, bilhetes e papeis (menos a placa) */
+int  fx_poster_count(Fx *fx);
+void fx_paper(Fx *fx, double x, double y, double vx, double vy);
+int  fx_paper_count(Fx *fx);
+/* style 0: coloridos; 1: vermelhos */
+void fx_fireworks(Fx *fx, double x, double y, int style);
+int  fx_particle_count(Fx *fx);
+void fx_notebook(Fx *fx, int on, int pet_x, int pet_y, int pet_w, int pet_h);
+
+void fx_ball_enable(Fx *fx, int on, double x, double y);
+int  fx_ball_enabled(Fx *fx);
+int  fx_ball_held(Fx *fx);
+void fx_ball_center(Fx *fx, double *cx, double *cy);
+void fx_ball_kick(Fx *fx, double vx, double vy);
+
+int  fx_poll(Fx *fx, FxEvent *event);
+void fx_update(Fx *fx, double dt, const Area *work, const Platform *plats, int nplats);
+
+#endif

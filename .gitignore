@@ -1,0 +1,7 @@
+*.o
+pestinha
+pestinha.exe
+*.tmp
+*.log
+core
+core.*

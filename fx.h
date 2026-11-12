@@ -2,15 +2,10 @@
 #define PESTINHA_FX_H
 
 #include "body.h"
-#include <stdint.h>
 
-/* Forward declaration do contexto de renderização */
+/* Forward declaration do contexto de renderização SDL2 */
 typedef struct RenderContext RenderContext;
 
-/* Declaração da função de desenho utilizada pelo fx.c */
-void render_draw_rect(RenderContext* ctx, int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a);
-
-/* Efeitos visuais do modo desktop... */
 typedef struct Fx Fx;
 typedef enum { FX_NONE = 0, FX_BALL_GRAB, FX_BALL_THROW } FxEventType;
 typedef struct { int type; double speed; } FxEvent;
@@ -41,7 +36,7 @@ void fx_ball_kick(Fx *fx, double vx, double vy);
 int  fx_poll(Fx *fx, FxEvent *event);
 void fx_update(Fx *fx, double dt, const Area *work, const Platform *plats, int nplats);
 
-/* Desenha a camada de efeitos na SDL2 */
+/* Função de renderização para a SDL2 */
 void fx_draw(Fx *fx, RenderContext *render);
 
 #endif // PESTINHA_FX_H
